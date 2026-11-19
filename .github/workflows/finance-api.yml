@@ -47,7 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack any zip in the repo root
-        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+        run: - name: Unpack project zip
+  run: unzip -oq .github/workflows/finance-tracker-code.zip -d .
       - name: Locate Dockerfile
         id: loc
         run: |
