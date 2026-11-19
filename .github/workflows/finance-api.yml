@@ -1,0 +1,103 @@
+name: Finance API
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack any zip in the repo root
+        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+      - name: Show repository files
+        run: find . -path ./.git -prune -o -type f -print | sort | head -80
+      - name: Locate backend
+        id: loc
+        run: |
+          f=$(find . -name requirements.txt -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::requirements.txt not found. Upload the project zip to the repo root."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: pip install -r requirements.txt
+      - name: Run tests
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: python -m unittest discover -v
+
+  build-api-image:
+    needs: test-api
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack any zip in the repo root
+        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+      - name: Locate Dockerfile
+        id: loc
+        run: |
+          f=$(find . -name Dockerfile -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::Dockerfile not found."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+      - name: Lowercase owner name (Docker requires lowercase)
+        id: owner
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.loc.outputs.dir }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.name }}/finance-api:latest
+            ghcr.io/${{ steps.owner.outputs.name }}/finance-api:${{ github.sha }}
+
+  build-ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack any zip in the repo root
+        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+      - name: Locate iOS project spec
+        id: loc
+        run: |
+          f=$(find . -name project.yml -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::project.yml not found. Upload the project zip to the repo root."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+      - run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: xcodegen generate
+      - name: Build
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: >
+          xcodebuild build
+          -project FinanceTracker.xcodeproj
+          -scheme FinanceTracker
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
