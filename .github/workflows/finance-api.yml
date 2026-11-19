@@ -15,7 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack any zip in the repo root
-        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+                run: |
+          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
+            echo "Unzipping $z"
+            unzip -oq "$z"
+          done
+          true
       - name: Show repository files
         run: find . -path ./.git -prune -o -type f -print | sort | head -80
       - name: Locate backend
@@ -32,7 +37,12 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         working-directory: ${{ steps.loc.outputs.dir }}
-        run: pip install -r requirements.txt
+                run: |
+          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
+            echo "Unzipping $z"
+            unzip -oq "$z"
+          done
+          true
       - name: Run tests
         working-directory: ${{ steps.loc.outputs.dir }}
         run: python -m unittest discover -v
@@ -47,17 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack any zip in the repo root
-        run: - name: Unpack project zip
-  run: unzip -oq .github/workflows/finance-tracker-code.zip -d .
-      - name: Locate Dockerfile
-        id: loc
-        run: |
-          f=$(find . -name Dockerfile -not -path './.git/*' | head -1)
-          if [ -z "$f" ]; then
-            echo "::error::Dockerfile not found."
-            exit 1
-          fi
-          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+                run: |
+          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
+            echo "Unzipping $z"
+            unzip -oq "$z"
+          done
+          true
       - name: Lowercase owner name (Docker requires lowercase)
         id: owner
         run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
@@ -80,16 +85,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack any zip in the repo root
-        run: for z in *.zip; do [ -f "$z" ] && unzip -oq "$z"; done; true
+                run: |
+          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
+            echo "Unzipping $z"
+            unzip -oq "$z"
+          done
+          true
       - name: Locate iOS project spec
         id: loc
         run: |
-          f=$(find . -name project.yml -not -path './.git/*' | head -1)
-          if [ -z "$f" ]; then
-            echo "::error::project.yml not found. Upload the project zip to the repo root."
-            exit 1
-          fi
-          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
+            echo "Unzipping $z"
+            unzip -oq "$z"
+          done
+          true
       - run: brew install xcodegen
       - name: Generate Xcode project
         working-directory: ${{ steps.loc.outputs.dir }}
