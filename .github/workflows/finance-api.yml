@@ -14,35 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack any zip in the repo root
-                run: |
+      - name: Unpack any zip files in the repo
+        run: |
           find . -name '*.zip' -not -path './.git/*' | while read -r z; do
             echo "Unzipping $z"
             unzip -oq "$z"
           done
           true
       - name: Show repository files
-        run: find . -path ./.git -prune -o -type f -print | sort | head -80
+        run: find . -path ./.git -prune -o -type f -print | sort | head -100
       - name: Locate backend
         id: loc
         run: |
           f=$(find . -name requirements.txt -not -path './.git/*' | head -1)
           if [ -z "$f" ]; then
-            echo "::error::requirements.txt not found. Upload the project zip to the repo root."
+            echo "::error::requirements.txt not found. Check the 'Show repository files' step: the project zip or the backend folder is not in the repo."
             exit 1
           fi
+          echo "Found backend in $(dirname "$f")"
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install dependencies
         working-directory: ${{ steps.loc.outputs.dir }}
-                run: |
-          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
-            echo "Unzipping $z"
-            unzip -oq "$z"
-          done
-          true
+        run: pip install -r requirements.txt
       - name: Run tests
         working-directory: ${{ steps.loc.outputs.dir }}
         run: python -m unittest discover -v
@@ -56,13 +52,22 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack any zip in the repo root
-                run: |
+      - name: Unpack any zip files in the repo
+        run: |
           find . -name '*.zip' -not -path './.git/*' | while read -r z; do
             echo "Unzipping $z"
             unzip -oq "$z"
           done
           true
+      - name: Locate Dockerfile
+        id: loc
+        run: |
+          f=$(find . -name Dockerfile -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::Dockerfile not found."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
       - name: Lowercase owner name (Docker requires lowercase)
         id: owner
         run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
@@ -84,8 +89,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack any zip in the repo root
-                run: |
+      - name: Unpack any zip files in the repo
+        run: |
           find . -name '*.zip' -not -path './.git/*' | while read -r z; do
             echo "Unzipping $z"
             unzip -oq "$z"
@@ -94,11 +99,12 @@ jobs:
       - name: Locate iOS project spec
         id: loc
         run: |
-          find . -name '*.zip' -not -path './.git/*' | while read -r z; do
-            echo "Unzipping $z"
-            unzip -oq "$z"
-          done
-          true
+          f=$(find . -name project.yml -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::project.yml not found. The ios folder is missing from the repo."
+            exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
       - run: brew install xcodegen
       - name: Generate Xcode project
         working-directory: ${{ steps.loc.outputs.dir }}
